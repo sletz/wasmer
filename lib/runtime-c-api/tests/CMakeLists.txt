@@ -14,10 +14,11 @@ add_executable(test-module-imports test-module-imports.c)
 add_executable(test-module-serialize test-module-serialize.c)
 add_executable(test-tables test-tables.c)
 add_executable(test-validate test-validate.c)
+add_executable(faustwasmer faustwasmer.cpp)
 
 find_library(
         WASMER_LIB NAMES libwasmer_runtime_c_api.dylib libwasmer_runtime_c_api.so libwasmer_runtime_c_api.dll
-        PATHS ${CMAKE_SOURCE_DIR}/../../../target/debug/
+        PATHS ${CMAKE_SOURCE_DIR}/../../../target/release/
 )
 
 if(NOT WASMER_LIB)
@@ -26,15 +27,18 @@ endif()
 
 enable_testing()
 
+set (CMAKE_CXX_FLAGS "-std=c++11 -g ${CMAKE_CXX_FLAGS}")
+
 set(
     COMPILER_OPTIONS
     # Clang or gcc
     $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:GNU>>:
-        "-Werror" >
+        "" >
     # MSVC
     $<$<CXX_COMPILER_ID:MSVC>:
         "/WX" >
 )
+
 
 target_link_libraries(test-exported-memory general ${WASMER_LIB})
 target_compile_options(test-exported-memory PRIVATE ${COMPILER_OPTIONS})
@@ -87,3 +91,9 @@ add_test(test-tables test-tables)
 target_link_libraries(test-validate general ${WASMER_LIB})
 target_compile_options(test-validate PRIVATE ${COMPILER_OPTIONS})
 add_test(test-validate test-validate)
+
+target_link_libraries(faustwasmer general ${WASMER_LIB})
+target_link_libraries(faustwasmer general jack)
+target_link_libraries(faustwasmer general HTTPDFaust)
+target_link_libraries(faustwasmer general microhttpd)
+target_compile_options(faustwasmer PRIVATE ${COMPILER_OPTIONS})
