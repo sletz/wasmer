@@ -15,6 +15,7 @@ add_executable(test-module-serialize test-module-serialize.c)
 add_executable(test-tables test-tables.c)
 add_executable(test-validate test-validate.c)
 add_executable(faustwasmer faustwasmer.cpp)
+add_executable(faustbench-wasmer faustbench-wasmer.cpp)
 
 find_library(
         WASMER_LIB NAMES libwasmer_runtime_c_api.dylib libwasmer_runtime_c_api.so libwasmer_runtime_c_api.dll
@@ -97,3 +98,6 @@ target_link_libraries(faustwasmer general jack)
 target_link_libraries(faustwasmer general HTTPDFaust)
 target_link_libraries(faustwasmer general microhttpd)
 target_compile_options(faustwasmer PRIVATE ${COMPILER_OPTIONS})
+
+target_link_libraries(faustbench-wasmer general ${WASMER_LIB})
+target_compile_options(faustbench-wasmer PRIVATE ${COMPILER_OPTIONS})

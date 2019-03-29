@@ -23,32 +23,19 @@
 
 #include "wasmer_dsp.h"
 #include "faust/audio/jack-dsp.h"
-#include "faust/gui/httpdUI.h"
-
-list<GUI*> GUI::fGuiList;
-ztimedmap GUI::gTimedZoneMap;
+#include "faust/dsp/dsp-bench.h"
+#include "faust/misc.h"
 
 int main(int argc, char* argv[])
 {
-    wasmer_dsp DSP(argv[1]);
+    wasmer_dsp* DSP = new wasmer_dsp(argv[1]);
     
-    jackaudio audio;
-    if (!audio.init(argv[1], &DSP)) {
-        return 0;
+    measure_dsp* mes = new measure_dsp(DSP, 512, 5.);  // Buffer_size and duration in sec of  measure
+    for (int i = 0; i < 2; i++) {
+        mes->measure();
+        cout << argv[argc-1] << " : " << mes->getStats() << " " << "(DSP CPU % : " << (mes->getCPULoad() * 100) << ")" << endl;
     }
     
-    httpdUI httpdinterface(argv[1], DSP.getNumInputs(), DSP.getNumOutputs(), argc, argv);
-    DSP.buildUserInterface(&httpdinterface);
-    
-    audio.start();
-    
-    httpdinterface.run();
-    
-    char c;
-    while ((c = getchar()) != 'q') {
-        usleep(1000000);
-    }
-    
-    audio.stop();
+    delete DSP;
     return 0;
 }
