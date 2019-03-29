@@ -72,7 +72,23 @@ class wasmer_dsp : public dsp {
         static float _roundf(wasmer_instance_context_t* ctx, float val) { return std::round(val); }
         static float _sinf(wasmer_instance_context_t* ctx, float val) { return std::sin(val); }
         static float _tanf(wasmer_instance_context_t* ctx, float val) { return std::tan(val); }
-        
+    
+        // Double: 14 functions
+        static double _acos(wasmer_instance_context_t* ctx, double val) { return std::acos(val); }
+        static double _asin(wasmer_instance_context_t* ctx, double val) { return std::asin(val); }
+        static double _atan(wasmer_instance_context_t* ctx, double val) { return std::atan(val); }
+        static double _atan2(wasmer_instance_context_t* ctx, double v1, double v2) { return std::atan2(v1, v2); }
+        static double _cos(wasmer_instance_context_t* ctx, double val) { return std::cos(val); }
+        static double _exp(wasmer_instance_context_t* ctx, double val) { return std::exp(val); }
+        static double _fmod(wasmer_instance_context_t* ctx, double v1, double v2) { return std::fmod(v1, v2); }
+        static double _log(wasmer_instance_context_t* ctx, double val) { return std::log(val); }
+        static double _log10(wasmer_instance_context_t* ctx, double val) { return std::log10(val); }
+        static double _pow(wasmer_instance_context_t* ctx, double v1, double v2) { return std::pow(v1, v2); }
+        static double _remainder(wasmer_instance_context_t* ctx, double v1, double v2) { return std::remainder(v1, v2); }
+        static double _round(wasmer_instance_context_t* ctx, double val) { return std::round(val); }
+        static double _sin(wasmer_instance_context_t* ctx, double val) { return std::sin(val); }
+        static double _tan(wasmer_instance_context_t* ctx, double val) { return std::tan(val); }
+    
         // Float
         typedef float (*math_unary_float_fun)(wasmer_instance_context_t* ctx, float val);
         typedef float (*math_binary_float_fun)(wasmer_instance_context_t* ctx, float val1, float val2);
@@ -97,13 +113,13 @@ class wasmer_dsp : public dsp {
         
         vector<wasmer_import_func_t*> fFunctionList;
         
-        //const char* module_name = "env";
         wasmer_byte_array fModuleNameBytes;
-        
-        wasmer_import_t createFloatUnary(const char* import_name, math_unary_float_fun fun)
+    
+        template <class T, wasmer_value_tag REAL>
+        wasmer_import_t createRealUnary(const char* import_name, T fun)
         {
-            wasmer_value_tag params_sig[] = { wasmer_value_tag::WASM_F32 };
-            wasmer_value_tag returns_sig[] = { wasmer_value_tag::WASM_F32 };
+            wasmer_value_tag params_sig[] = { REAL };
+            wasmer_value_tag returns_sig[] = { REAL };
             
             wasmer_byte_array import_name_bytes;
             import_name_bytes.bytes = (const uint8_t*)import_name;
@@ -120,11 +136,12 @@ class wasmer_dsp : public dsp {
             
             return func_import;
         }
-        
-        wasmer_import_t createFloatBinary(const char* import_name, math_binary_float_fun fun)
+    
+        template <class T, wasmer_value_tag REAL>
+        wasmer_import_t createRealBinary(const char* import_name, T fun)
         {
-            wasmer_value_tag params_sig[] = { wasmer_value_tag::WASM_F32, wasmer_value_tag::WASM_F32 };
-            wasmer_value_tag returns_sig[] = { wasmer_value_tag::WASM_F32 };
+            wasmer_value_tag params_sig[] = { REAL, REAL };
+            wasmer_value_tag returns_sig[] = { REAL };
             
             wasmer_byte_array import_name_bytes;
             import_name_bytes.bytes = (const uint8_t*)import_name;
@@ -141,7 +158,25 @@ class wasmer_dsp : public dsp {
             
             return func_import;
         }
-        
+    
+        wasmer_import_t createFloatUnary(const char* import_name, math_unary_float_fun fun)
+        {
+            return createRealUnary<math_unary_float_fun, wasmer_value_tag::WASM_F32>(import_name, fun);
+        }
+        wasmer_import_t createDoubleUnary(const char* import_name, math_unary_double_fun fun)
+        {
+            return createRealUnary<math_unary_double_fun, wasmer_value_tag::WASM_F64>(import_name, fun);
+        }
+    
+        wasmer_import_t createFloatBinary(const char* import_name, math_binary_float_fun fun)
+        {
+            return createRealBinary<math_binary_float_fun, wasmer_value_tag::WASM_F32>(import_name, fun);
+        }
+        wasmer_import_t createDoubleBinary(const char* import_name, math_binary_double_fun fun)
+        {
+            return createRealBinary<math_binary_double_fun, wasmer_value_tag::WASM_F64>(import_name, fun);
+        }
+    
         wasmer_import_t createIntUnary(const char* import_name, math_unary_int_fun fun)
         {
             wasmer_value_tag params_sig[] = { wasmer_value_tag::WASM_I32 };
@@ -183,7 +218,12 @@ class wasmer_dsp : public dsp {
             fModuleNameBytes.bytes = (const uint8_t*)module_name;
             fModuleNameBytes.bytes_len = strlen(module_name);
             
-            wasmer_import_t imports[] = { createIntUnary("_abs", _abs),
+            wasmer_import_t imports[] = {
+                
+                // Int
+                createIntUnary("_abs", _abs),
+                
+                // Float
                 createFloatUnary("_acosf", _acosf),
                 createFloatUnary("_asinf", _asinf),
                 createFloatUnary("_atanf", _atanf),
@@ -198,10 +238,26 @@ class wasmer_dsp : public dsp {
                 createFloatUnary("_roundf", _roundf),
                 createFloatUnary("_sinf", _sinf),
                 createFloatUnary("_tanf", _tanf),
+                
+                // Double
+                createDoubleUnary("_acos", _acos),
+                createDoubleUnary("_asin", _asin),
+                createDoubleUnary("_atan", _atan),
+                createDoubleBinary("_atan2", _atan2),
+                createDoubleUnary("_cos", _cos),
+                createDoubleUnary("_exp", _exp),
+                createDoubleBinary("_fmod", _fmod),
+                createDoubleUnary("_log", _log),
+                createDoubleUnary("_log10", _log10),
+                createDoubleBinary("_pow", _pow),
+                createDoubleBinary("_remainder", _remainder),
+                createDoubleUnary("_round", _round),
+                createDoubleUnary("_sin", _sin),
+                createDoubleUnary("_tan", _tan),
             };
             
             fInstance = nullptr;
-            wasmer_result_t instantiate_result = wasmer_module_instantiate(fModule, &fInstance, imports, 1 + 14);
+            wasmer_result_t instantiate_result = wasmer_module_instantiate(fModule, &fInstance, imports, 1 + 14 * 2);
             if (instantiate_result != wasmer_result_t::WASMER_OK) print_wasmer_error();
             
             assert(instantiate_result == wasmer_result_t::WASMER_OK);
