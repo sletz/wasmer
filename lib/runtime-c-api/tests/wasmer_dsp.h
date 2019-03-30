@@ -266,8 +266,6 @@ class wasmer_dsp : public dsp {
             wasmer_exports_t* exports = nullptr;
             wasmer_instance_exports(fInstance, &exports);
             
-            int export_length = wasmer_exports_len(exports);
-            
             // Memory is as index 7
             wasmer_export_t* export1 = wasmer_exports_get(exports, 7);
             wasmer_import_export_kind kind = wasmer_export_kind(export1);
@@ -282,12 +280,7 @@ class wasmer_dsp : public dsp {
             fMemory = (char*)wasmer_memory_data(memory);
             string json = string(fMemory);
             
-            JSONUIDecoder decoder(json);
-            if (decoder.hasCompileOption("-double")) {
-                fDecoder = new JSONUIDoubleDecoder(json);
-            } else {
-                fDecoder = new JSONUIFloatDecoder(json);
-            }
+            fDecoder = createJSONUIDecoder(json);
             
             std::cout << "Libfaust version: " << fDecoder->getLibVersion() << std::endl;
             std::cout << "Compilation options: " << fDecoder->getCompileOptions() << std::endl;
