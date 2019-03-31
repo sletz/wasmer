@@ -22,7 +22,6 @@
  ************************************************************************/
 
 #include "wasmer_dsp.h"
-#include "faust/audio/jack-dsp.h"
 #include "faust/dsp/dsp-bench.h"
 #include "faust/misc.h"
 
@@ -30,7 +29,7 @@ int main(int argc, char* argv[])
 {
     wasmer_dsp* DSP = new wasmer_dsp(argv[1]);
     
-    measure_dsp mes(DSP, 512, 5.);  // Buffer_size and duration in sec of  measure
+    measure_dsp mes(DSP, 512, 5.);  // Buffer_size and duration in sec of measure
     mes.measure();
     cout << argv[argc-1] << " : " << mes.getStats() << " " << "(DSP CPU % : " << (mes.getCPULoad() * 100) << ")" << endl;
     FAUSTBENCH_LOG<double>(mes.getStats());

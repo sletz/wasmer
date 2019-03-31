@@ -115,8 +115,8 @@ class wasmer_dsp : public dsp {
         
         wasmer_byte_array fModuleNameBytes;
     
-        template <class T, wasmer_value_tag REAL>
-        wasmer_import_t createRealUnary(const char* import_name, T fun)
+        template <class FUN_TYPE, wasmer_value_tag REAL>
+        wasmer_import_t createRealUnary(const char* import_name, FUN_TYPE fun)
         {
             wasmer_value_tag params_sig[] = { REAL };
             wasmer_value_tag returns_sig[] = { REAL };
@@ -137,8 +137,8 @@ class wasmer_dsp : public dsp {
             return func_import;
         }
     
-        template <class T, wasmer_value_tag REAL>
-        wasmer_import_t createRealBinary(const char* import_name, T fun)
+        template <class FUN_TYPE, wasmer_value_tag REAL>
+        wasmer_import_t createRealBinary(const char* import_name, FUN_TYPE fun)
         {
             wasmer_value_tag params_sig[] = { REAL, REAL };
             wasmer_value_tag returns_sig[] = { REAL };
