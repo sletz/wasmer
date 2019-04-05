@@ -73,6 +73,14 @@ class wasmer_dsp : public dsp {
         static float _sinf(wasmer_instance_context_t* ctx, float val) { return std::sin(val); }
         static float _tanf(wasmer_instance_context_t* ctx, float val) { return std::tan(val); }
     
+        // Hyperbolic: 6 functions
+        static float _acoshf(wasmer_instance_context_t* ctx, float val) { return std::acosh(val); }
+        static float _asinhf(wasmer_instance_context_t* ctx, float val) { return std::asinh(val); }
+        static float _atanhf(wasmer_instance_context_t* ctx, float val) { return std::atanh(val); }
+        static float _coshf(wasmer_instance_context_t* ctx, float val) { return std::cosh(val); }
+        static float _sinhf(wasmer_instance_context_t* ctx, float val) { return std::sinh(val); }
+        static float _tanhf(wasmer_instance_context_t* ctx, float val) { return std::tanh(val); }
+    
         // Double: 14 functions
         static double _acos(wasmer_instance_context_t* ctx, double val) { return std::acos(val); }
         static double _asin(wasmer_instance_context_t* ctx, double val) { return std::asin(val); }
@@ -88,6 +96,14 @@ class wasmer_dsp : public dsp {
         static double _round(wasmer_instance_context_t* ctx, double val) { return std::round(val); }
         static double _sin(wasmer_instance_context_t* ctx, double val) { return std::sin(val); }
         static double _tan(wasmer_instance_context_t* ctx, double val) { return std::tan(val); }
+    
+        // Hyperbolic: 6 functions
+        static float _acosh(wasmer_instance_context_t* ctx, float val) { return std::acosh(val); }
+        static float _asinh(wasmer_instance_context_t* ctx, float val) { return std::asinh(val); }
+        static float _atanh(wasmer_instance_context_t* ctx, float val) { return std::atanh(val); }
+        static float _cosh(wasmer_instance_context_t* ctx, float val) { return std::cosh(val); }
+        static float _sinh(wasmer_instance_context_t* ctx, float val) { return std::sinh(val); }
+        static float _tanh(wasmer_instance_context_t* ctx, float val) { return std::tanh(val); }
     
         // Float
         typedef float (*math_unary_float_fun)(wasmer_instance_context_t* ctx, float val);
@@ -239,6 +255,14 @@ class wasmer_dsp : public dsp {
                 createFloatUnary("_sinf", _sinf),
                 createFloatUnary("_tanf", _tanf),
                 
+                // Hyperbolic
+                createFloatUnary("_acoshf", _acoshf),
+                createFloatUnary("_asinhf", _asinhf),
+                createFloatUnary("_atanhf", _atanhf),
+                createFloatUnary("_coshf", _coshf),
+                createFloatUnary("_sinhf", _sinhf),
+                createFloatUnary("_tanhf", _tanhf),
+                
                 // Double
                 createDoubleUnary("_acos", _acos),
                 createDoubleUnary("_asin", _asin),
@@ -254,10 +278,18 @@ class wasmer_dsp : public dsp {
                 createDoubleUnary("_round", _round),
                 createDoubleUnary("_sin", _sin),
                 createDoubleUnary("_tan", _tan),
+                
+                // Hyperbolic
+                createFloatUnary("_acosh", _acosh),
+                createFloatUnary("_asinh", _asinh),
+                createFloatUnary("_atanh", _atanh),
+                createFloatUnary("_cosh", _cosh),
+                createFloatUnary("_sinh", _sinh),
+                createFloatUnary("_tanh", _tanh),
             };
             
             fInstance = nullptr;
-            wasmer_result_t instantiate_result = wasmer_module_instantiate(fModule, &fInstance, imports, 1 + 14 * 2);
+            wasmer_result_t instantiate_result = wasmer_module_instantiate(fModule, &fInstance, imports, 1 + (14 + 6) * 2);
             if (instantiate_result != wasmer_result_t::WASMER_OK) print_wasmer_error();
             
             assert(instantiate_result == wasmer_result_t::WASMER_OK);

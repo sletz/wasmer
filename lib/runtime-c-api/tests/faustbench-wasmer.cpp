@@ -23,7 +23,6 @@
 
 #include "wasmer_dsp.h"
 #include "faust/dsp/dsp-bench.h"
-#include "faust/misc.h"
 
 int main(int argc, char* argv[])
 {
