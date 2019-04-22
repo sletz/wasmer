@@ -36,10 +36,12 @@ impl<T: Copy + ValueType> WasmPtr<T, Item> {
             return Err(__WASI_EFAULT);
         }
         unsafe {
-            let cell_ptr = memory
-                .view::<T>()
-                .get_unchecked((self.offset() as usize) / mem::size_of::<T>())
-                as *const _;
+            // clears bits below aligment amount (assumes power of 2) to align pointer
+            let aligner = |ptr: usize, align: usize| ptr & !(align - 1);
+            let cell_ptr = aligner(
+                memory.view::<u8>().as_ptr().add(self.offset as usize) as usize,
+                mem::align_of::<T>(),
+            ) as *const Cell<T>;
             Ok(&*cell_ptr)
         }
     }
@@ -72,6 +74,16 @@ impl<T: Copy + ValueType> WasmPtr<T, Array> {
 
 unsafe impl<T: Copy, Ty> WasmExternType for WasmPtr<T, Ty> {
     const TYPE: Type = Type::I32;
+
+    fn to_bits(self) -> u64 {
+        self.offset as u64
+    }
+    fn from_bits(n: u64) -> Self {
+        Self {
+            offset: n as u32,
+            _phantom: PhantomData,
+        }
+    }
 }
 
 unsafe impl<T: Copy, Ty> ValueType for WasmPtr<T, Ty> {}

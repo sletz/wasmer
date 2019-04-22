@@ -6,16 +6,39 @@ use std::io;
 use std::io::Read;
 use std::path::PathBuf;
 use std::process::exit;
+use std::str::FromStr;
 
 use hashbrown::HashMap;
 use structopt::StructOpt;
 
 use wasmer::webassembly::InstanceABI;
 use wasmer::*;
+use wasmer_clif_backend::CraneliftCompiler;
+#[cfg(feature = "backend:llvm")]
+use wasmer_llvm_backend::LLVMCompiler;
 use wasmer_runtime::cache::{Cache as BaseCache, FileSystemCache, WasmHash, WASMER_VERSION_HASH};
-use wasmer_runtime_core::{self, backend::CompilerConfig};
+use wasmer_runtime_core::{
+    self,
+    backend::{Compiler, CompilerConfig},
+};
+#[cfg(feature = "backend:singlepass")]
+use wasmer_singlepass_backend::SinglePassCompiler;
 #[cfg(feature = "wasi")]
 use wasmer_wasi;
+
+// stub module to make conditional compilation happy
+#[cfg(not(feature = "wasi"))]
+mod wasmer_wasi {
+    use wasmer_runtime_core::{import::ImportObject, module::Module};
+
+    pub fn is_wasi_module(_module: &Module) -> bool {
+        false
+    }
+
+    pub fn generate_import_object(_args: Vec<Vec<u8>>, _envs: Vec<Vec<u8>>) -> ImportObject {
+        unimplemented!()
+    }
+}
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "wasmer", about = "Wasm execution runtime.")]
@@ -48,13 +71,58 @@ struct Run {
     #[structopt(parse(from_os_str))]
     path: PathBuf,
 
+    // Disable the cache
+    #[structopt(
+        long = "backend",
+        default_value = "cranelift",
+        raw(possible_values = "Backend::variants()", case_insensitive = "true")
+    )]
+    backend: Backend,
+
+    /// Emscripten symbol map
+    #[structopt(long = "em-symbol-map", parse(from_os_str), group = "emscripten")]
+    em_symbol_map: Option<PathBuf>,
+
+    /// WASI pre-opened directory
+    #[structopt(long = "dir", multiple = true, group = "wasi")]
+    pre_opened_directories: Vec<String>,
+
+    #[structopt(long = "command-name", hidden = true)]
+    command_name: Option<String>,
+
     /// Application arguments
     #[structopt(name = "--", raw(multiple = "true"))]
     args: Vec<String>,
+}
 
-    /// Emscripten symbol map
-    #[structopt(long = "em-symbol-map", parse(from_os_str))]
-    em_symbol_map: Option<PathBuf>,
+#[allow(dead_code)]
+#[derive(Debug)]
+enum Backend {
+    Cranelift,
+    Singlepass,
+    LLVM,
+}
+
+impl Backend {
+    pub fn variants() -> &'static [&'static str] {
+        &["singlepass", "cranelift", "llvm"]
+    }
+}
+
+impl FromStr for Backend {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Backend, String> {
+        match s.to_lowercase().as_str() {
+            "singlepass" => Ok(Backend::Singlepass),
+            "cranelift" => Ok(Backend::Cranelift),
+            "llvm" => Ok(Backend::LLVM),
+            // "llvm" => Err(
+            //     "The LLVM backend option is not enabled by default due to binary size constraints"
+            //         .to_string(),
+            // ),
+            _ => Err(format!("The backend {} doesn't exist", s)),
+        }
+    }
 }
 
 #[derive(Debug, StructOpt)]
@@ -163,6 +231,18 @@ fn execute_wasm(options: &Run) -> Result<(), String> {
             .map_err(|e| format!("Can't convert from wast to wasm: {:?}", e))?;
     }
 
+    let compiler: Box<dyn Compiler> = match options.backend {
+        #[cfg(feature = "backend:singlepass")]
+        Backend::Singlepass => Box::new(SinglePassCompiler::new()),
+        #[cfg(not(feature = "backend:singlepass"))]
+        Backend::Singlepass => return Err("The singlepass backend is not enabled".to_string()),
+        Backend::Cranelift => Box::new(CraneliftCompiler::new()),
+        #[cfg(feature = "backend:llvm")]
+        Backend::LLVM => Box::new(LLVMCompiler::new()),
+        #[cfg(not(feature = "backend:llvm"))]
+        Backend::LLVM => return Err("the llvm backend is not enabled".to_string()),
+    };
+
     let module = if !disable_cache {
         // If we have cache enabled
 
@@ -188,11 +268,12 @@ fn execute_wasm(options: &Run) -> Result<(), String> {
                 module
             }
             Err(_) => {
-                let module = webassembly::compile_with_config(
+                let module = webassembly::compile_with_config_with(
                     &wasm_binary[..],
                     CompilerConfig {
                         symbol_map: em_symbol_map,
                     },
+                    &*compiler,
                 )
                 .map_err(|e| format!("Can't compile module: {:?}", e))?;
                 // We try to save the module into a cache file
@@ -203,17 +284,17 @@ fn execute_wasm(options: &Run) -> Result<(), String> {
         };
         module
     } else {
-        webassembly::compile_with_config(
+        webassembly::compile_with_config_with(
             &wasm_binary[..],
             CompilerConfig {
                 symbol_map: em_symbol_map,
             },
+            &*compiler,
         )
         .map_err(|e| format!("Can't compile module: {:?}", e))?
     };
 
     // TODO: refactor this
-    #[cfg(not(feature = "wasi"))]
     let (abi, import_object, _em_globals) = if wasmer_emscripten::is_emscripten_module(&module) {
         let mut emscripten_globals = wasmer_emscripten::EmscriptenGlobals::new(&module);
         (
@@ -222,34 +303,34 @@ fn execute_wasm(options: &Run) -> Result<(), String> {
             Some(emscripten_globals), // TODO Em Globals is here to extend, lifetime, find better solution
         )
     } else {
-        (
-            InstanceABI::None,
-            wasmer_runtime_core::import::ImportObject::new(),
-            None,
-        )
-    };
-
-    #[cfg(feature = "wasi")]
-    let (abi, import_object) = if wasmer_wasi::is_wasi_module(&module) {
-        (
-            InstanceABI::WASI,
-            wasmer_wasi::generate_import_object(
-                [options.path.to_str().unwrap().to_owned()]
+        if cfg!(feature = "wasi") && wasmer_wasi::is_wasi_module(&module) {
+            (
+                InstanceABI::WASI,
+                wasmer_wasi::generate_import_object(
+                    if let Some(cn) = &options.command_name {
+                        [cn.clone()]
+                    } else {
+                        [options.path.to_str().unwrap().to_owned()]
+                    }
                     .iter()
                     .chain(options.args.iter())
                     .cloned()
                     .map(|arg| arg.into_bytes())
                     .collect(),
-                env::vars()
-                    .map(|(k, v)| format!("{}={}", k, v).into_bytes())
-                    .collect(),
-            ),
-        )
-    } else {
-        (
-            InstanceABI::None,
-            wasmer_runtime_core::import::ImportObject::new(),
-        )
+                    env::vars()
+                        .map(|(k, v)| format!("{}={}", k, v).into_bytes())
+                        .collect(),
+                    options.pre_opened_directories.clone(),
+                ),
+                None,
+            )
+        } else {
+            (
+                InstanceABI::None,
+                wasmer_runtime_core::import::ImportObject::new(),
+                None,
+            )
+        }
     };
 
     let mut instance = module
@@ -260,7 +341,11 @@ fn execute_wasm(options: &Run) -> Result<(), String> {
         &module,
         &mut instance,
         abi,
-        options.path.to_str().unwrap(),
+        if let Some(cn) = &options.command_name {
+            cn
+        } else {
+            options.path.to_str().unwrap()
+        },
         options.args.iter().map(|arg| arg.as_str()).collect(),
     )
     .map_err(|e| format!("{:?}", e))?;
