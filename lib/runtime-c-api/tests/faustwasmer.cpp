@@ -30,15 +30,16 @@ ztimedmap GUI::gTimedZoneMap;
 
 int main(int argc, char* argv[])
 {
-    wasmer_dsp DSP(argv[1]);
+    wasmer_dsp_factory factory(argv[1]);
+    dsp* DSP = factory.createDSPInstance();
     
     jackaudio audio;
-    if (!audio.init(argv[1], &DSP)) {
+    if (!audio.init(argv[1], DSP)) {
         return 0;
     }
     
-    httpdUI httpdinterface(argv[1], DSP.getNumInputs(), DSP.getNumOutputs(), argc, argv);
-    DSP.buildUserInterface(&httpdinterface);
+    httpdUI httpdinterface(argv[1], DSP->getNumInputs(), DSP->getNumOutputs(), argc, argv);
+    DSP->buildUserInterface(&httpdinterface);
     
     audio.start();
     

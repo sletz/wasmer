@@ -26,7 +26,8 @@
 
 int main(int argc, char* argv[])
 {
-    wasmer_dsp* DSP = new wasmer_dsp(argv[1]);
+    wasmer_dsp_factory factory(argv[1]);
+    dsp* DSP = factory.createDSPInstance();
     
     measure_dsp mes(DSP, 512, 5.);  // Buffer_size and duration in sec of measure
     mes.measure();

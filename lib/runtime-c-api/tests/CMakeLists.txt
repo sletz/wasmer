@@ -14,8 +14,8 @@ add_executable(test-module-imports test-module-imports.c)
 add_executable(test-module-serialize test-module-serialize.c)
 add_executable(test-tables test-tables.c)
 add_executable(test-validate test-validate.c)
-add_executable(faustwasmer faustwasmer.cpp)
-add_executable(faustbench-wasmer faustbench-wasmer.cpp)
+add_executable(faustwasmer faustwasmer.cpp wasmer_dsp.cpp)
+add_executable(faustbench-wasmer faustbench-wasmer.cpp wasmer_dsp.cpp)
 
 find_library(
         WASMER_LIB NAMES libwasmer_runtime_c_api.dylib libwasmer_runtime_c_api.so libwasmer_runtime_c_api.dll
