@@ -4,6 +4,7 @@
 #include <cstdarg>
 #include <cstdint>
 #include <cstdlib>
+#include <new>
 
 enum class wasmer_import_export_kind : uint32_t {
   WASM_FUNCTION,

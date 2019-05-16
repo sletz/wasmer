@@ -23,9 +23,15 @@
 
 #include "wasmer_dsp.h"
 #include "faust/dsp/dsp-bench.h"
+#include "faust/misc.h"
 
 int main(int argc, char* argv[])
 {
+    if (isopt(argv, "-h") || isopt(argv, "-help")) {
+        cout << "faustbench-wasmer foo.wasm" << endl;
+        exit(EXIT_FAILURE);
+    }
+
     wasmer_dsp_factory factory(argv[1]);
     dsp* DSP = factory.createDSPInstance();
     
