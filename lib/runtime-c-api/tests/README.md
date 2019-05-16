@@ -6,13 +6,17 @@ Several programs are available to test the wasmer based compilation chain.
 The **faustwasmer** opens a DSP wasm module and run it with the wasmer machinery. The DSP module is JIT compiled and opened as a JACK client.
 
 So for instance:
-faust -lang noise.dsp -o noise.wasm
+
+faust -lang wasm noise.dsp -o noise.wasm
+
 faustwasmer noise.wasm
 
 ## faustbench-wasmer
 
-The **faustbench-wasmer** allows to benchmark a DSP wasm module. 
+The **faustbench-wasmer** allows to benchmark a DSP wasm module running in the wasmer machinery. 
 
 So for instance:
-faust -lang noise.dsp -o noise.wasm
-austbench-wasmer noise.wasm
+
+faust -lang wasm noise.dsp -o noise.wasm
+
+faustbench-wasmer noise.wasm
