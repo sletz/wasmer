@@ -5,9 +5,11 @@ use crate::{
     export::{Context, Export, ExportIter, FuncPointer},
     global::Global,
     import::{ImportObject, LikeNamespace},
+    loader::Loader,
     memory::Memory,
     module::{ExportIndex, Module, ModuleInfo, ModuleInner},
     sig_registry::SigRegistry,
+    structures::TypedIndex,
     table::Table,
     typed_func::{Func, Wasm, WasmTrapInfo, WasmTypeList},
     types::{FuncIndex, FuncSig, GlobalIndex, LocalOrImport, MemoryIndex, TableIndex, Type, Value},
@@ -38,7 +40,7 @@ impl Drop for InstanceInner {
 ///
 /// [`ImportObject`]: struct.ImportObject.html
 pub struct Instance {
-    module: Arc<ModuleInner>,
+    pub module: Arc<ModuleInner>,
     inner: Box<InstanceInner>,
     #[allow(dead_code)]
     import_object: ImportObject,
@@ -125,6 +127,12 @@ impl Instance {
         }
 
         Ok(instance)
+    }
+
+    pub fn load<T: Loader>(&self, loader: T) -> ::std::result::Result<T::Instance, T::Error> {
+        loader.load(&*self.module.runnable_module, &self.module.info, unsafe {
+            &*self.inner.vmctx
+        })
     }
 
     /// Through generic magic and the awe-inspiring power of traits, we bring you...
@@ -214,6 +222,26 @@ impl Instance {
         }
     }
 
+    pub fn resolve_func(&self, name: &str) -> ResolveResult<usize> {
+        let export_index =
+            self.module
+                .info
+                .exports
+                .get(name)
+                .ok_or_else(|| ResolveError::ExportNotFound {
+                    name: name.to_string(),
+                })?;
+
+        if let ExportIndex::Func(func_index) = export_index {
+            Ok(func_index.index())
+        } else {
+            Err(ResolveError::ExportWrongType {
+                name: name.to_string(),
+            }
+            .into())
+        }
+    }
+
     /// This returns the representation of a function that can be called
     /// safely.
     ///
@@ -262,7 +290,7 @@ impl Instance {
         }
     }
 
-    /// Call an exported webassembly function given the export name.
+    /// Call an exported WebAssembly function given the export name.
     /// Pass arguments by wrapping each one in the [`Value`] enum.
     /// The returned values are also each wrapped in a [`Value`].
     ///
@@ -270,7 +298,7 @@ impl Instance {
     ///
     /// # Note:
     /// This returns `CallResult<Vec<Value>>` in order to support
-    /// the future multi-value returns webassembly feature.
+    /// the future multi-value returns WebAssembly feature.
     ///
     /// # Usage:
     /// ```
@@ -601,7 +629,7 @@ pub struct DynFunc<'a> {
 }
 
 impl<'a> DynFunc<'a> {
-    /// Call an exported webassembly function safely.
+    /// Call an exported WebAssembly function safely.
     ///
     /// Pass arguments by wrapping each one in the [`Value`] enum.
     /// The returned values are also each wrapped in a [`Value`].
@@ -610,7 +638,7 @@ impl<'a> DynFunc<'a> {
     ///
     /// # Note:
     /// This returns `CallResult<Vec<Value>>` in order to support
-    /// the future multi-value returns webassembly feature.
+    /// the future multi-value returns WebAssembly feature.
     ///
     /// # Usage:
     /// ```

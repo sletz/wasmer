@@ -1,4 +1,4 @@
-#![deny(unused_imports, unused_variables)]
+#![deny(unused_imports, unused_variables, unused_unsafe, unreachable_patterns)]
 #![cfg_attr(nightly, feature(unwind_attributes))]
 
 #[cfg(test)]
@@ -21,6 +21,7 @@ pub mod export;
 pub mod global;
 pub mod import;
 pub mod instance;
+pub mod loader;
 pub mod memory;
 pub mod module;
 pub mod parse;
