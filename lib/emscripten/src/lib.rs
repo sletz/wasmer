@@ -24,9 +24,6 @@ use wasmer_runtime_core::{
 
 #[macro_use]
 mod macros;
-//#[cfg(test)]
-mod file_descriptor;
-pub mod stdio;
 
 // EMSCRIPTEN APIS
 mod bitwise;
@@ -47,6 +44,7 @@ mod signal;
 mod storage;
 mod syscalls;
 mod time;
+mod ucontext;
 mod utils;
 mod varargs;
 
@@ -547,6 +545,8 @@ pub fn generate_emscripten_env(globals: &mut EmscriptenGlobals) -> ImportObject 
         "_sysconf" => func!(crate::env::_sysconf),
         "_getaddrinfo" => func!(crate::env::_getaddrinfo),
         "_times" => func!(crate::env::_times),
+        "_pathconf" => func!(crate::env::_pathconf),
+        "_fpathconf" => func!(crate::env::_fpathconf),
 
         // Syscalls
         "___syscall1" => func!(crate::syscalls::___syscall1),
@@ -689,6 +689,7 @@ pub fn generate_emscripten_env(globals: &mut EmscriptenGlobals) -> ImportObject 
         "_asctime_r" => func!(crate::time::_asctime_r),
         "_localtime" => func!(crate::time::_localtime),
         "_time" => func!(crate::time::_time),
+        "_timegm" => func!(crate::time::_timegm),
         "_strftime" => func!(crate::time::_strftime),
         "_strftime_l" => func!(crate::time::_strftime_l),
         "_localtime_r" => func!(crate::time::_localtime_r),
@@ -707,6 +708,7 @@ pub fn generate_emscripten_env(globals: &mut EmscriptenGlobals) -> ImportObject 
         "_llvm_exp2_f32" => func!(crate::math::_llvm_exp2_f32),
         "_llvm_exp2_f64" => func!(crate::math::_llvm_exp2_f64),
         "_llvm_trunc_f64" => func!(crate::math::_llvm_trunc_f64),
+        "_llvm_fma_f64" => func!(crate::math::_llvm_fma_f64),
         "_emscripten_random" => func!(crate::math::_emscripten_random),
 
         // Jump
@@ -725,6 +727,7 @@ pub fn generate_emscripten_env(globals: &mut EmscriptenGlobals) -> ImportObject 
         "_dlsym" => func!(crate::linking::_dlsym),
 
         // wasm32-unknown-emscripten
+        "_alarm" => func!(crate::emscripten_target::_alarm),
         "_atexit" => func!(crate::emscripten_target::_atexit),
         "setTempRet0" => func!(crate::emscripten_target::setTempRet0),
         "getTempRet0" => func!(crate::emscripten_target::getTempRet0),
@@ -775,11 +778,16 @@ pub fn generate_emscripten_env(globals: &mut EmscriptenGlobals) -> ImportObject 
         "_pthread_setspecific" => func!(crate::emscripten_target::_pthread_setspecific),
         "_pthread_once" => func!(crate::emscripten_target::_pthread_once),
         "_pthread_key_create" => func!(crate::emscripten_target::_pthread_key_create),
+        "_pthread_rwlock_destroy" => func!(crate::emscripten_target::_pthread_rwlock_destroy),
+        "_pthread_rwlock_init" => func!(crate::emscripten_target::_pthread_rwlock_init),
+        "_pthread_rwlock_wrlock" => func!(crate::emscripten_target::_pthread_rwlock_wrlock),
         "___gxx_personality_v0" => func!(crate::emscripten_target::___gxx_personality_v0),
+        "_gai_strerror" => func!(crate::emscripten_target::_gai_strerror),
         "_getdtablesize" => func!(crate::emscripten_target::_getdtablesize),
         "_gethostbyaddr" => func!(crate::emscripten_target::_gethostbyaddr),
         "_gethostbyname_r" => func!(crate::emscripten_target::_gethostbyname_r),
         "_getloadavg" => func!(crate::emscripten_target::_getloadavg),
+        "_getnameinfo" => func!(crate::emscripten_target::_getnameinfo),
         "invoke_dii" => func!(crate::emscripten_target::invoke_dii),
         "invoke_diiii" => func!(crate::emscripten_target::invoke_diiii),
         "invoke_iiiii" => func!(crate::emscripten_target::invoke_iiiii),
@@ -819,6 +827,12 @@ pub fn generate_emscripten_env(globals: &mut EmscriptenGlobals) -> ImportObject 
         "invoke_viid" => func!(crate::emscripten_target::invoke_viid),
         "invoke_viidii" => func!(crate::emscripten_target::invoke_viidii),
         "invoke_viidddddddd" => func!(crate::emscripten_target::invoke_viidddddddd),
+
+        // ucontext
+        "_getcontext" => func!(crate::ucontext::_getcontext),
+        "_makecontext" => func!(crate::ucontext::_makecontext),
+        "_setcontext" => func!(crate::ucontext::_setcontext),
+        "_swapcontext" => func!(crate::ucontext::_swapcontext),
     };
 
     for null_func_name in globals.null_func_names.iter() {
