@@ -24,7 +24,7 @@
 #include "wasmer_dsp.h"
 #include "faust/audio/jack-dsp.h"
 #include "faust/gui/httpdUI.h"
-#include "faust/gui/SoundUI.h"
+//#include "faust/gui/SoundUI.h"
 #include "faust/misc.h"
 
 list<GUI*> GUI::fGuiList;
@@ -49,8 +49,8 @@ int main(int argc, char* argv[])
     httpdUI httpdinterface(argv[1], DSP->getNumInputs(), DSP->getNumOutputs(), argc, argv);
     DSP->buildUserInterface(&httpdinterface);
     
-    SoundUI soundui;
-    DSP->buildUserInterface(&soundui);
+    //SoundUI soundui;
+    //DSP->buildUserInterface(&soundui);
     
     audio.start();
     

@@ -94,8 +94,8 @@ dsp* wasmer_dsp_factory::createDSPInstance()
     wasmer_exports_t* exports = nullptr;
     wasmer_instance_exports(instance, &exports);
     
-    // Memory is as index 7
-    wasmer_export_t* export1 = wasmer_exports_get(exports, 7);
+    // Memory is as index 11
+    wasmer_export_t* export1 = wasmer_exports_get(exports, 11);
     wasmer_import_export_kind kind = wasmer_export_kind(export1);
     assert(kind == wasmer_import_export_kind::WASM_MEMORY);
     
