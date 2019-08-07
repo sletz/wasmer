@@ -4,9 +4,9 @@
 use std::fs;
 
 fn main() {
-    #[cfg(not(target = "wasi"))]
-    let read_dir = fs::read_dir("wasitests/test_fs/hamlet").unwrap();
-    #[cfg(target = "wasi")]
+    #[cfg(not(target_os = "wasi"))]
+    std::env::set_current_dir("wasitests/test_fs/hamlet").unwrap();
+
     let read_dir = fs::read_dir(".").unwrap();
     let mut out = vec![];
     for entry in read_dir {

@@ -1,14 +1,19 @@
-#![deny(unused_imports, unused_variables, unused_unsafe, unreachable_patterns)]
-
+#![deny(
+    dead_code,
+    unused_imports,
+    unused_variables,
+    unused_unsafe,
+    unreachable_patterns
+)]
 extern crate byteorder;
 extern crate structopt;
 
 use structopt::StructOpt;
 
-#[cfg(feature = "loader:kernel")]
+#[cfg(feature = "loader-kernel")]
 use wasmer_singlepass_backend::SinglePassCompiler;
 
-#[cfg(feature = "loader:kernel")]
+#[cfg(feature = "loader-kernel")]
 use std::os::unix::net::{UnixListener, UnixStream};
 
 #[derive(Debug, StructOpt)]
@@ -24,14 +29,14 @@ struct Listen {
     socket: String,
 }
 
-#[cfg(feature = "loader:kernel")]
+#[cfg(feature = "loader-kernel")]
 const CMD_RUN_CODE: u32 = 0x901;
-#[cfg(feature = "loader:kernel")]
+#[cfg(feature = "loader-kernel")]
 const CMD_READ_MEMORY: u32 = 0x902;
-#[cfg(feature = "loader:kernel")]
+#[cfg(feature = "loader-kernel")]
 const CMD_WRITE_MEMORY: u32 = 0x903;
 
-#[cfg(feature = "loader:kernel")]
+#[cfg(feature = "loader-kernel")]
 fn handle_client(mut stream: UnixStream) {
     use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
     use std::io::{Read, Write};
@@ -54,6 +59,8 @@ fn handle_client(mut stream: UnixStream) {
             symbol_map: None,
             memory_bound_check_mode: MemoryBoundCheckMode::Disable,
             enforce_stack_check: true,
+            track_state: false,
+            features: Default::default(),
         },
         &SinglePassCompiler::new(),
     )
@@ -93,7 +100,7 @@ fn handle_client(mut stream: UnixStream) {
                 match ret {
                     Ok(x) => {
                         stream.write_u32::<LittleEndian>(1).unwrap();
-                        stream.write_u64::<LittleEndian>(x).unwrap();
+                        stream.write_u128::<LittleEndian>(x).unwrap();
                     }
                     Err(e) => {
                         println!("Execution error: {:?}", e);
@@ -131,7 +138,7 @@ fn handle_client(mut stream: UnixStream) {
     }
 }
 
-#[cfg(feature = "loader:kernel")]
+#[cfg(feature = "loader-kernel")]
 fn run_listen(opts: Listen) {
     let listener = UnixListener::bind(&opts.socket).unwrap();
     use std::thread;
@@ -154,8 +161,9 @@ fn run_listen(opts: Listen) {
     }
 }
 
-#[cfg(feature = "loader:kernel")]
+#[cfg(feature = "loader-kernel")]
 fn main() {
+    panic!("Kwasm not updated for 128-bit support, yet. Sorry!");
     let options = CLIOptions::from_args();
     match options {
         CLIOptions::Listen(listen) => {
@@ -164,7 +172,7 @@ fn main() {
     }
 }
 
-#[cfg(not(feature = "loader:kernel"))]
+#[cfg(not(feature = "loader-kernel"))]
 fn main() {
     panic!("Kwasm loader is not enabled during compilation.");
 }
