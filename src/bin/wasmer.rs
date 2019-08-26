@@ -1,6 +1,8 @@
 #![deny(
     dead_code,
+    nonstandard_style,
     unused_imports,
+    unused_mut,
     unused_variables,
     unused_unsafe,
     unreachable_patterns
@@ -21,7 +23,7 @@ use structopt::StructOpt;
 use wasmer::*;
 use wasmer_clif_backend::CraneliftCompiler;
 #[cfg(feature = "backend-llvm")]
-use wasmer_llvm_backend::LLVMCompiler;
+use wasmer_llvm_backend::{LLVMCompiler, LLVMOptions};
 use wasmer_runtime::{
     cache::{Cache as BaseCache, FileSystemCache, WasmHash},
     Func, Value, VERSION,
@@ -83,9 +85,30 @@ struct PrestandardFeatures {
     #[structopt(long = "enable-simd")]
     simd: bool,
 
+    /// Enable support for the threads proposal.
+    #[structopt(long = "enable-threads")]
+    threads: bool,
+
     /// Enable support for all pre-standard proposals.
     #[structopt(long = "enable-all")]
     all: bool,
+}
+
+#[cfg(feature = "backend-llvm")]
+#[derive(Debug, StructOpt, Clone)]
+/// LLVM backend flags.
+pub struct LLVMCLIOptions {
+    /// Emit LLVM IR before optimization pipeline.
+    #[structopt(long = "llvm-pre-opt-ir", parse(from_os_str))]
+    pre_opt_ir: Option<PathBuf>,
+
+    /// Emit LLVM IR after optimization pipeline.
+    #[structopt(long = "llvm-post-opt-ir", parse(from_os_str))]
+    post_opt_ir: Option<PathBuf>,
+
+    /// Emit LLVM generated native code object file.
+    #[structopt(long = "backend-llvm-object-file", parse(from_os_str))]
+    obj_file: Option<PathBuf>,
 }
 
 #[derive(Debug, StructOpt)]
@@ -154,6 +177,10 @@ struct Run {
     /// as if no `cache-key` argument was passed.
     #[structopt(long = "cache-key", hidden = true)]
     cache_key: Option<String>,
+
+    #[cfg(feature = "backend-llvm")]
+    #[structopt(flatten)]
+    backend_llvm_options: LLVMCLIOptions,
 
     #[structopt(flatten)]
     features: PrestandardFeatures,
@@ -352,8 +379,25 @@ fn execute_wasm(options: &Run) -> Result<(), String> {
         if options.features.simd || options.features.all {
             features.enable_simd();
         }
+        if options.features.threads || options.features.all {
+            features.enable_threads();
+        }
         wasm_binary = wabt::wat2wasm_with_features(wasm_binary, features)
             .map_err(|e| format!("Can't convert from wast to wasm: {:?}", e))?;
+    }
+
+    #[cfg(feature = "backend-llvm")]
+    {
+        if options.backend == Backend::LLVM {
+            let options = options.backend_llvm_options.clone();
+            unsafe {
+                wasmer_llvm_backend::GLOBAL_OPTIONS = LLVMOptions {
+                    pre_opt_ir: options.pre_opt_ir,
+                    post_opt_ir: options.post_opt_ir,
+                    obj_file: options.obj_file,
+                }
+            }
+        }
     }
 
     let compiler: Box<dyn Compiler> = match options.backend {
@@ -390,6 +434,7 @@ fn execute_wasm(options: &Run) -> Result<(), String> {
                 track_state,
                 features: Features {
                     simd: options.features.simd || options.features.all,
+                    threads: options.features.threads || options.features.all,
                 },
             },
             &*compiler,
@@ -403,6 +448,7 @@ fn execute_wasm(options: &Run) -> Result<(), String> {
                 track_state,
                 features: Features {
                     simd: options.features.simd || options.features.all,
+                    threads: options.features.threads || options.features.all,
                 },
                 ..Default::default()
             },
@@ -450,6 +496,7 @@ fn execute_wasm(options: &Run) -> Result<(), String> {
                             track_state,
                             features: Features {
                                 simd: options.features.simd || options.features.all,
+                                threads: options.features.threads || options.features.all,
                             },
                             ..Default::default()
                         },
@@ -488,7 +535,7 @@ fn execute_wasm(options: &Run) -> Result<(), String> {
         let index = instance
             .resolve_func("_start")
             .expect("The loader requires a _start function to be present in the module");
-        let mut ins: Box<LoadedInstance<Error = String>> = match loader {
+        let mut ins: Box<dyn LoadedInstance<Error = String>> = match loader {
             LoaderName::Local => Box::new(
                 instance
                     .load(LocalLoader)
@@ -507,7 +554,7 @@ fn execute_wasm(options: &Run) -> Result<(), String> {
 
     // TODO: refactor this
     if wasmer_emscripten::is_emscripten_module(&module) {
-        let mut emscripten_globals = wasmer_emscripten::EmscriptenGlobals::new(&module);
+        let mut emscripten_globals = wasmer_emscripten::EmscriptenGlobals::new(&module)?;
         let import_object = wasmer_emscripten::generate_emscripten_env(&mut emscripten_globals);
         let mut instance = module
             .instantiate(&import_object)
@@ -782,6 +829,7 @@ fn validate_wasm(validate: Validate) -> Result<(), String> {
         &wasm_binary,
         Features {
             simd: validate.features.simd || validate.features.all,
+            threads: validate.features.threads || validate.features.all,
         },
     )
     .map_err(|err| format!("Validation failed: {}", err))?;
