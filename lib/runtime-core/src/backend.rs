@@ -22,6 +22,7 @@ pub mod sys {
 }
 pub use crate::sig_registry::SigRegistry;
 
+/// Enum used to select which compiler should be used to generate code.
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Backend {
     Cranelift,
@@ -30,6 +31,7 @@ pub enum Backend {
 }
 
 impl Backend {
+    /// Get a list of the currently enabled (via feature flag) backends.
     pub fn variants() -> &'static [&'static str] {
         &[
             #[cfg(feature = "backend-cranelift")]
@@ -41,8 +43,8 @@ impl Backend {
         ]
     }
 
-    /// stable string representation of the backend
-    /// can be used as part of a cache key, for example
+    /// Stable string representation of the backend.
+    /// It can be used as part of a cache key, for example.
     pub fn to_string(&self) -> &'static str {
         match self {
             Backend::Cranelift => "cranelift",
@@ -111,6 +113,7 @@ impl Default for MemoryBoundCheckMode {
     }
 }
 
+/// Controls which experimental features will be enabled.
 #[derive(Debug, Default)]
 pub struct Features {
     pub simd: bool,
@@ -159,6 +162,10 @@ pub trait RunnableModule: Send + Sync {
         None
     }
 
+    unsafe fn patch_local_function(&self, _idx: usize, _target_address: usize) -> bool {
+        false
+    }
+
     /// A wasm trampoline contains the necessary data to dynamically call an exported wasm function.
     /// Given a particular signature index, we are returned a trampoline that is matched with that
     /// signature and an invoke function that can call the trampoline.
@@ -173,6 +180,11 @@ pub trait RunnableModule: Send + Sync {
 
     /// Returns the beginning offsets of all functions, including import trampolines.
     fn get_offsets(&self) -> Option<Vec<usize>> {
+        None
+    }
+
+    /// Returns the beginning offsets of all local functions.
+    fn get_local_function_offsets(&self) -> Option<Vec<usize>> {
         None
     }
 }

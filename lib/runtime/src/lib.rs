@@ -7,6 +7,9 @@
     unused_unsafe,
     unreachable_patterns
 )]
+#![doc(html_favicon_url = "https://wasmer.io/static/icons/favicon.ico")]
+#![doc(html_logo_url = "https://avatars3.githubusercontent.com/u/44205449?s=200&v=4")]
+
 //! Wasmer-runtime is a library that makes embedding WebAssembly
 //! in your application easy, efficient, and safe.
 //!
@@ -186,6 +189,10 @@ pub fn instantiate(wasm: &[u8], import_object: &ImportObject) -> error::Result<I
 }
 
 /// Get a single instance of the default compiler to use.
+///
+/// The output of this function can be controlled by the mutually
+/// exclusive `default-backend-llvm`, `default-backend-singlepass`,
+/// and `default-backend-cranelift` feature flags.
 pub fn default_compiler() -> impl Compiler {
     #[cfg(any(
         all(
@@ -216,6 +223,11 @@ pub fn default_compiler() -> impl Compiler {
     DefaultCompiler::new()
 }
 
+/// Get the `Compiler` as a trait object for the given `Backend`.
+/// Returns `Option` because support for the requested `Compiler` may
+/// not be enabled by feature flags.
+///
+/// To get a list of the enabled backends as strings, call `Backend::variants()`.
 pub fn compiler_for_backend(backend: Backend) -> Option<Box<dyn Compiler>> {
     match backend {
         #[cfg(feature = "cranelift")]
@@ -238,5 +250,5 @@ pub fn compiler_for_backend(backend: Backend) -> Option<Box<dyn Compiler>> {
     }
 }
 
-/// The current version of this crate
+/// The current version of this crate.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

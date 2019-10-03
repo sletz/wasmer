@@ -10,7 +10,10 @@ use crate::{
 use rayon::prelude::*;
 
 use byteorder::{ByteOrder, LittleEndian};
-use cranelift_codegen::{ir, isa, Context};
+use cranelift_codegen::{
+    binemit::{Stackmap, StackmapSink},
+    ir, isa, Context,
+};
 use std::{
     mem,
     ptr::{write_unaligned, NonNull},
@@ -56,6 +59,11 @@ pub struct FuncResolverBuilder {
     local_relocs: Map<LocalFuncIndex, Box<[LocalRelocation]>>,
     external_relocs: Map<LocalFuncIndex, Box<[ExternalRelocation]>>,
     import_len: usize,
+}
+
+pub struct NoopStackmapSink {}
+impl StackmapSink for NoopStackmapSink {
+    fn add_stackmap(&mut self, _: u32, _: Stackmap) {}
 }
 
 impl FuncResolverBuilder {
@@ -109,12 +117,13 @@ impl FuncResolverBuilder {
                         ctx.func = func.to_owned();
                         let mut reloc_sink = RelocSink::new();
                         let mut local_trap_sink = LocalTrapSink::new();
-
+                        let mut stackmap_sink = NoopStackmapSink {};
                         ctx.compile_and_emit(
                             isa,
                             &mut code_buf,
                             &mut reloc_sink,
                             &mut local_trap_sink,
+                            &mut stackmap_sink,
                         )
                         .map_err(|e| CompileError::InternalError { msg: e.to_string() })?;
                         ctx.clear();
@@ -254,12 +263,12 @@ impl FuncResolverBuilder {
                     },
                     RelocationType::VmCall(vmcall) => match vmcall {
                         VmCall::Local(kind) => match kind {
-                            VmCallKind::StaticMemoryGrow => vmcalls::local_static_memory_grow as _,
-                            VmCallKind::StaticMemorySize => vmcalls::local_static_memory_size as _,
-
-                            VmCallKind::SharedStaticMemoryGrow => unimplemented!(),
-                            VmCallKind::SharedStaticMemorySize => unimplemented!(),
-
+                            VmCallKind::StaticMemoryGrow | VmCallKind::SharedStaticMemoryGrow => {
+                                vmcalls::local_static_memory_grow as _
+                            }
+                            VmCallKind::StaticMemorySize | VmCallKind::SharedStaticMemorySize => {
+                                vmcalls::local_static_memory_size as _
+                            }
                             VmCallKind::DynamicMemoryGrow => {
                                 vmcalls::local_dynamic_memory_grow as _
                             }
@@ -268,16 +277,12 @@ impl FuncResolverBuilder {
                             }
                         },
                         VmCall::Import(kind) => match kind {
-                            VmCallKind::StaticMemoryGrow => {
+                            VmCallKind::StaticMemoryGrow | VmCallKind::SharedStaticMemoryGrow => {
                                 vmcalls::imported_static_memory_grow as _
                             }
-                            VmCallKind::StaticMemorySize => {
+                            VmCallKind::StaticMemorySize | VmCallKind::SharedStaticMemorySize => {
                                 vmcalls::imported_static_memory_size as _
                             }
-
-                            VmCallKind::SharedStaticMemoryGrow => unimplemented!(),
-                            VmCallKind::SharedStaticMemorySize => unimplemented!(),
-
                             VmCallKind::DynamicMemoryGrow => {
                                 vmcalls::imported_dynamic_memory_grow as _
                             }

@@ -7,6 +7,9 @@
     unused_unsafe,
     unreachable_patterns
 )]
+#![doc(html_favicon_url = "https://wasmer.io/static/icons/favicon.ico")]
+#![doc(html_logo_url = "https://avatars3.githubusercontent.com/u/44205449?s=200&v=4")]
+
 #[macro_use]
 extern crate wasmer_runtime_core;
 
@@ -59,6 +62,7 @@ mod math;
 mod memory;
 mod process;
 mod pthread;
+mod ptr;
 mod signal;
 mod storage;
 mod syscalls;
@@ -470,11 +474,7 @@ impl EmscriptenGlobals {
         let (memory_min, memory_max, shared) = get_emscripten_memory_size(&module)?;
 
         // Memory initialization
-        let memory_type = MemoryDescriptor {
-            minimum: memory_min,
-            maximum: memory_max,
-            shared: shared,
-        };
+        let memory_type = MemoryDescriptor::new(memory_min, memory_max, shared)?;
         let memory = Memory::new(memory_type).unwrap();
 
         let table_type = TableDescriptor {
@@ -731,8 +731,9 @@ pub fn generate_emscripten_env(globals: &mut EmscriptenGlobals) -> ImportObject 
         "___syscall345" => func!(crate::syscalls::___syscall345),
 
         // Process
-        "abort" => func!(crate::process::em_abort),
+        "abort" => func!(crate::process::_abort),
         "_abort" => func!(crate::process::_abort),
+        "_prctl" => func!(crate::process::_prctl),
         "abortStackOverflow" => func!(crate::process::abort_stack_overflow),
         "_llvm_trap" => func!(crate::process::_llvm_trap),
         "_fork" => func!(crate::process::_fork),
@@ -825,6 +826,9 @@ pub fn generate_emscripten_env(globals: &mut EmscriptenGlobals) -> ImportObject 
         "_gmtime" => func!(crate::time::_gmtime),
 
         // Math
+        "sqrt" => func!(crate::math::sqrt),
+        "floor" => func!(crate::math::floor),
+        "fabs" => func!(crate::math::fabs),
         "f64-rem" => func!(crate::math::f64_rem),
         "_llvm_copysign_f32" => func!(crate::math::_llvm_copysign_f32),
         "_llvm_copysign_f64" => func!(crate::math::_llvm_copysign_f64),

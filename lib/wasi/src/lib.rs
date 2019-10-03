@@ -7,6 +7,19 @@
     unused_unsafe,
     unreachable_patterns
 )]
+#![doc(html_favicon_url = "https://wasmer.io/static/icons/favicon.ico")]
+#![doc(html_logo_url = "https://avatars3.githubusercontent.com/u/44205449?s=200&v=4")]
+
+//! Wasmer's WASI implementation
+//!
+//! Use `generate_import_object` to create an `ImportObject`.  This `ImportObject`
+//! can be combined with a module to create an `Instance` which can execute WASI
+//! Wasm functions.
+//!
+//! See `state` for the experimental WASI FS API.  Also see the
+//! [WASI plugin example](https://github.com/wasmerio/wasmer/blob/master/examples/plugin.rs)
+//! for an example of how to extend WASI using the WASI FS API.
+
 #[cfg(target = "windows")]
 extern crate winapi;
 
@@ -34,27 +47,32 @@ pub struct ExitCode {
     pub code: syscalls::types::__wasi_exitcode_t,
 }
 
+/// Creates a Wasi [`ImportObject`] with [`WasiState`].
 pub fn generate_import_object(
     args: Vec<Vec<u8>>,
     envs: Vec<Vec<u8>>,
-    preopened_files: Vec<String>,
+    preopened_files: Vec<PathBuf>,
     mapped_dirs: Vec<(String, PathBuf)>,
 ) -> ImportObject {
     let state_gen = move || {
+        // TODO: look into removing all these unnecessary clones
         fn state_destructor(data: *mut c_void) {
             unsafe {
                 drop(Box::from_raw(data as *mut WasiState));
             }
         }
+        let preopened_files = preopened_files.clone();
+        let mapped_dirs = mapped_dirs.clone();
+        //let wasi_builder = create_wasi_instance();
 
         let state = Box::new(WasiState {
-            fs: WasiFs::new(&preopened_files, &mapped_dirs).unwrap(),
-            args: &args[..],
-            envs: &envs[..],
+            fs: WasiFs::new(&preopened_files, &mapped_dirs).expect("Could not create WASI FS"),
+            args: args.clone(),
+            envs: envs.clone(),
         });
 
         (
-            Box::leak(state) as *mut WasiState as *mut c_void,
+            Box::into_raw(state) as *mut c_void,
             state_destructor as fn(*mut c_void),
         )
     };

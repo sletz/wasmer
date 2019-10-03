@@ -7,6 +7,9 @@
     unused_unsafe,
     unreachable_patterns
 )]
+#![doc(html_favicon_url = "https://wasmer.io/static/icons/favicon.ico")]
+#![doc(html_logo_url = "https://avatars3.githubusercontent.com/u/44205449?s=200&v=4")]
+
 mod cache;
 mod code;
 mod libcalls;
@@ -31,7 +34,7 @@ extern crate serde;
 fn get_isa() -> Box<dyn isa::TargetIsa> {
     let flags = {
         let mut builder = settings::builder();
-        builder.set("opt_level", "best").unwrap();
+        builder.set("opt_level", "speed_and_size").unwrap();
         builder.set("jump_tables_enabled", "false").unwrap();
 
         if cfg!(not(test)) {
@@ -39,7 +42,7 @@ fn get_isa() -> Box<dyn isa::TargetIsa> {
         }
 
         let flags = settings::Flags::new(builder);
-        debug_assert_eq!(flags.opt_level(), settings::OptLevel::Best);
+        debug_assert_eq!(flags.opt_level(), settings::OptLevel::SpeedAndSize);
         flags
     };
     isa::lookup(Triple::host()).unwrap().finish(flags)
