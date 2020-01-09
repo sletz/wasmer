@@ -1,3 +1,36 @@
+
+#if !defined(WASMER_H_MACROS)
+
+#define WASMER_H_MACROS
+
+// Define the `ARCH_X86_X64` constant.
+#if defined(MSVC) && defined(_M_AMD64)
+#  define ARCH_X86_64
+#elif (defined(GCC) || defined(__GNUC__) || defined(__clang__)) && defined(__x86_64__)
+#  define ARCH_X86_64
+#endif
+
+// Compatibility with non-Clang compilers.
+#if !defined(__has_attribute)
+#  define __has_attribute(x) 0
+#endif
+
+// Compatibility with non-Clang compilers.
+#if !defined(__has_declspec_attribute)
+#  define __has_declspec_attribute(x) 0
+#endif
+
+// Define the `DEPRECATED` macro.
+#if defined(GCC) || defined(__GNUC__) || __has_attribute(deprecated)
+#  define DEPRECATED(message) __attribute__((deprecated(message)))
+#elif defined(MSVC) || __has_declspec_attribute(deprecated)
+#  define DEPRECATED(message) __declspec(deprecated(message))
+#endif
+
+#define WASMER_WASI_ENABLED
+#endif // WASMER_H_MACROS
+
+
 #ifndef WASMER_H
 #define WASMER_H
 
@@ -5,6 +38,29 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+
+#if defined(WASMER_WASI_ENABLED)
+enum Version {
+  /**
+   * Version cannot be detected or is unknown.
+   */
+  Unknown = 0,
+  /**
+   * Latest version. See `wasmer_wasi::WasiVersion::Latest` to
+   * leran more.
+   */
+  Latest = 1,
+  /**
+   * `wasi_unstable`.
+   */
+  Snapshot0 = 2,
+  /**
+   * `wasi_snapshot_preview1`.
+   */
+  Snapshot1 = 3,
+};
+typedef uint8_t Version;
+#endif
 
 /**
  * List of export/import kinds.
@@ -34,17 +90,34 @@ typedef struct {
 
 } wasmer_module_t;
 
+typedef struct {
+
+} wasmer_instance_t;
+
+typedef struct {
+  const uint8_t *bytes;
+  uint32_t bytes_len;
+} wasmer_byte_array;
+
+#if defined(WASMER_EMSCRIPTEN_ENABLED)
+/**
+ * Type used to construct an import_object_t with Emscripten imports.
+ */
+typedef struct {
+
+} wasmer_emscripten_globals_t;
+#endif
+
+typedef struct {
+
+} wasmer_import_object_t;
+
 /**
  * Opaque pointer to `NamedExportDescriptor`.
  */
 typedef struct {
 
 } wasmer_export_descriptor_t;
-
-typedef struct {
-  const uint8_t *bytes;
-  uint32_t bytes_len;
-} wasmer_byte_array;
 
 /**
  * Opaque pointer to `NamedExportDescriptors`.
@@ -113,10 +186,6 @@ typedef struct {
 
 typedef struct {
 
-} wasmer_import_object_t;
-
-typedef struct {
-
 } wasmer_table_t;
 
 /**
@@ -142,10 +211,6 @@ typedef struct {
 
 typedef struct {
 
-} wasmer_instance_t;
-
-typedef struct {
-
 } wasmer_instance_context_t;
 
 typedef struct {
@@ -162,18 +227,25 @@ typedef struct {
 
 } wasmer_serialized_module_t;
 
+#if (!defined(_WIN32) && defined(ARCH_X86_64))
 typedef struct {
 
 } wasmer_trampoline_buffer_builder_t;
+#endif
 
+#if (!defined(_WIN32) && defined(ARCH_X86_64))
 typedef struct {
 
 } wasmer_trampoline_callable_t;
+#endif
 
+#if (!defined(_WIN32) && defined(ARCH_X86_64))
 typedef struct {
 
 } wasmer_trampoline_buffer_t;
+#endif
 
+#if defined(WASMER_WASI_ENABLED)
 /**
  * Opens a directory that's visible to the WASI module as `alias` but
  * is backed by the host file at `host_file_path`
@@ -188,6 +260,7 @@ typedef struct {
    */
   wasmer_byte_array host_file_path;
 } wasmer_wasi_map_dir_entry_t;
+#endif
 
 /**
  * Creates a new Module from the given wasm bytes.
@@ -200,6 +273,64 @@ typedef struct {
 wasmer_result_t wasmer_compile(wasmer_module_t **module,
                                uint8_t *wasm_bytes,
                                uint32_t wasm_bytes_len);
+
+#if defined(WASMER_EMSCRIPTEN_ENABLED)
+/**
+ * Convenience function for setting up arguments and calling the Emscripten
+ * main function.
+ *
+ * WARNING:
+ *
+ * Do not call this function on untrusted code when operating without
+ * additional sandboxing in place.
+ * Emscripten has access to many host system calls and therefore may do very
+ * bad things.
+ */
+wasmer_result_t wasmer_emscripten_call_main(wasmer_instance_t *instance,
+                                            const wasmer_byte_array *args,
+                                            unsigned int args_len);
+#endif
+
+#if defined(WASMER_EMSCRIPTEN_ENABLED)
+/**
+ * Destroy `wasmer_emscrpten_globals_t` created by
+ * `wasmer_emscripten_get_emscripten_globals`.
+ */
+void wasmer_emscripten_destroy_globals(wasmer_emscripten_globals_t *globals);
+#endif
+
+#if defined(WASMER_EMSCRIPTEN_ENABLED)
+/**
+ * Create a `wasmer_import_object_t` with Emscripten imports, use
+ * `wasmer_emscripten_get_emscripten_globals` to get a
+ * `wasmer_emscripten_globals_t` from a `wasmer_module_t`.
+ *
+ * WARNING:
+ *1
+ * This `import_object_t` contains thin-wrappers around host system calls.
+ * Do not use this to execute untrusted code without additional sandboxing.
+ */
+wasmer_import_object_t *wasmer_emscripten_generate_import_object(wasmer_emscripten_globals_t *globals);
+#endif
+
+#if defined(WASMER_EMSCRIPTEN_ENABLED)
+/**
+ * Create a `wasmer_emscripten_globals_t` from a Wasm module.
+ */
+wasmer_emscripten_globals_t *wasmer_emscripten_get_globals(const wasmer_module_t *module);
+#endif
+
+#if defined(WASMER_EMSCRIPTEN_ENABLED)
+/**
+ * Execute global constructors (required if the module is compiled from C++)
+ * and sets up the internal environment.
+ *
+ * This function sets the data pointer in the same way that
+ * [`wasmer_instance_context_data_set`] does.
+ */
+wasmer_result_t wasmer_emscripten_set_up(wasmer_instance_t *instance,
+                                         wasmer_emscripten_globals_t *globals);
+#endif
 
 /**
  * Gets export descriptor kind
@@ -780,6 +911,7 @@ uint32_t wasmer_table_length(wasmer_table_t *table);
  */
 wasmer_result_t wasmer_table_new(wasmer_table_t **table, wasmer_limits_t limits);
 
+#if (!defined(_WIN32) && defined(ARCH_X86_64))
 /**
  * Adds a callinfo trampoline to the builder.
  */
@@ -787,45 +919,59 @@ uintptr_t wasmer_trampoline_buffer_builder_add_callinfo_trampoline(wasmer_trampo
                                                                    const wasmer_trampoline_callable_t *func,
                                                                    const void *ctx,
                                                                    uint32_t num_params);
+#endif
 
+#if (!defined(_WIN32) && defined(ARCH_X86_64))
 /**
  * Adds a context trampoline to the builder.
  */
 uintptr_t wasmer_trampoline_buffer_builder_add_context_trampoline(wasmer_trampoline_buffer_builder_t *builder,
                                                                   const wasmer_trampoline_callable_t *func,
                                                                   const void *ctx);
+#endif
 
+#if (!defined(_WIN32) && defined(ARCH_X86_64))
 /**
  * Finalizes the trampoline builder into an executable buffer.
  */
 wasmer_trampoline_buffer_t *wasmer_trampoline_buffer_builder_build(wasmer_trampoline_buffer_builder_t *builder);
+#endif
 
+#if (!defined(_WIN32) && defined(ARCH_X86_64))
 /**
  * Creates a new trampoline builder.
  */
 wasmer_trampoline_buffer_builder_t *wasmer_trampoline_buffer_builder_new(void);
+#endif
 
+#if (!defined(_WIN32) && defined(ARCH_X86_64))
 /**
  * Destroys the trampoline buffer if not null.
  */
 void wasmer_trampoline_buffer_destroy(wasmer_trampoline_buffer_t *buffer);
+#endif
 
+#if (!defined(_WIN32) && defined(ARCH_X86_64))
 /**
  * Returns the callable pointer for the trampoline with index `idx`.
  */
 const wasmer_trampoline_callable_t *wasmer_trampoline_buffer_get_trampoline(const wasmer_trampoline_buffer_t *buffer,
                                                                             uintptr_t idx);
+#endif
 
+#if (!defined(_WIN32) && defined(ARCH_X86_64))
 /**
  * Returns the context added by `add_context_trampoline`, from within the callee function.
  */
 void *wasmer_trampoline_get_context(void);
+#endif
 
 /**
  * Returns true for valid wasm bytes and false for invalid bytes
  */
 bool wasmer_validate(const uint8_t *wasm_bytes, uint32_t wasm_bytes_len);
 
+#if defined(WASMER_WASI_ENABLED)
 /**
  * Convenience function that creates a WASI import object with no arguments,
  * environment variables, preopened files, or mapped directories.
@@ -834,7 +980,9 @@ bool wasmer_validate(const uint8_t *wasm_bytes, uint32_t wasm_bytes_len);
  * empty values.
  */
 wasmer_import_object_t *wasmer_wasi_generate_default_import_object(void);
+#endif
 
+#if defined(WASMER_WASI_ENABLED)
 /**
  * Creates a WASI import object.
  *
@@ -850,5 +998,35 @@ wasmer_import_object_t *wasmer_wasi_generate_import_object(const wasmer_byte_arr
                                                            unsigned int preopened_files_len,
                                                            const wasmer_wasi_map_dir_entry_t *mapped_dirs,
                                                            unsigned int mapped_dirs_len);
+#endif
+
+#if defined(WASMER_WASI_ENABLED)
+/**
+ * Creates a WASI import object for a specific version.
+ *
+ * This function is similar to `wasmer_wasi_generate_import_object`
+ * except that the first argument describes the WASI version.
+ *
+ * The version is expected to be of kind `Version`.
+ */
+wasmer_import_object_t *wasmer_wasi_generate_import_object_for_version(unsigned char version,
+                                                                       const wasmer_byte_array *args,
+                                                                       unsigned int args_len,
+                                                                       const wasmer_byte_array *envs,
+                                                                       unsigned int envs_len,
+                                                                       const wasmer_byte_array *preopened_files,
+                                                                       unsigned int preopened_files_len,
+                                                                       const wasmer_wasi_map_dir_entry_t *mapped_dirs,
+                                                                       unsigned int mapped_dirs_len);
+#endif
+
+#if defined(WASMER_WASI_ENABLED)
+/**
+ * Find the version of WASI used by the module.
+ *
+ * In case of error, the returned version is `Version::Unknown`.
+ */
+Version wasmer_wasi_get_version(const wasmer_module_t *module);
+#endif
 
 #endif /* WASMER_H */
