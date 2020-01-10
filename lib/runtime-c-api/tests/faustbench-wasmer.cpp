@@ -27,7 +27,7 @@
 
 int main(int argc, char* argv[])
 {
-    if (isopt(argv, "-h") || isopt(argv, "-help")) {
+    if (argc == 1 || isopt(argv, "-h") || isopt(argv, "-help")) {
         cout << "faustbench-wasmer foo.wasm" << endl;
         exit(EXIT_FAILURE);
     }
